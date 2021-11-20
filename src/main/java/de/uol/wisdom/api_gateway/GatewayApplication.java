@@ -15,4 +15,10 @@ public class GatewayApplication {
 		SpringApplication.run(GatewayApplication.class, args);
 	}
 
+	@Bean
+	@Order(-1)
+	public GlobalFilter requestIdHeaderGenerator() {
+		return new RequestIDHeaderGeneration();
+	}
+
 }
