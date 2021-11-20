@@ -1,0 +1,12 @@
+server:
+  port: 8090
+  max-http-header-size: 512KB
+
+spring:
+  profiles:
+    default: production
+  application:
+    name: api-gateway
+    gateway:
+      httpclient:
+        response-timeout: 1h
