@@ -1,6 +1,6 @@
 package de.uol.wisdom.api_gateway;
 
-import de.uol.wisdom.api_gateway.filters.RequestIDHeaderGenerationGlobalPreFilter;
+import de.uol.wisdom.api_gateway.filters.RequestIDHeaderGeneration;
 import de.uol.wisdom.api_gateway.filters.TokenValidationFilter;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -19,6 +19,12 @@ public class GatewayApplication {
 	@Order(-1)
 	public GlobalFilter requestIdHeaderGenerator() {
 		return new RequestIDHeaderGeneration();
+	}
+
+	@Bean
+	@Order(0)
+	public GlobalFilter AuthorizationCheck() {
+		return new TokenValidationFilter();
 	}
 
 }
