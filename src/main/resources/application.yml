@@ -8,13 +8,15 @@ eureka:
     healthcheck:
       enabled: true
     service-url:
-      defaultServer: http://${SERVICE_REGISTRY_HOSTNAME}:8761/eureka/
+      defaultZone: http://${SERVICE_REGISTRY_HOSTNAME}:8761/eureka/
+    registry-fetch-interval-seconds: 5
+    webclient:
+      enabled: true
   instance:
-    non-secure-port: 8080
+    non-secure-port: 8090
     appname: api-gateway
-    lease-expiration-duration-in-seconds: 10
-    lease-renewal-interval-in-seconds: 5
-
+    lease-expiration-duration-in-seconds: 5
+    lease-renewal-interval-in-seconds: 1
 spring:
   profiles:
     default: production
@@ -45,3 +47,6 @@ spring:
         - RewritePath=(?<serviceId>/[^/]+)/(?<path>/?.*), /$\{path}
         - TokenRelay=
 
+logging:
+  level:
+    com.netflix.discovery: warn
