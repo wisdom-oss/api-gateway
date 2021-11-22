@@ -1,9 +1,13 @@
 package de.uol.wisdom.api_gateway.filters;
 
+import com.sun.source.tree.BreakTree;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
@@ -12,6 +16,9 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 
+import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.isAlreadyRouted;
+
+@Component
 public class RequestIDHeaderGeneration implements GlobalFilter {
 
 	final Logger logger = LoggerFactory.getLogger(RequestIDHeaderGeneration.class);
@@ -19,25 +26,31 @@ public class RequestIDHeaderGeneration implements GlobalFilter {
 	@Override
 	public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
 		// Generate a random uuid
-		String requestId = String.valueOf(UUID.randomUUID());
-		logger.info("Generated X-Request-ID('{}') for request from {}",
-		            requestId, ZonedDateTime
-				            .now(ZoneOffset.UTC)
-				            .format(DateTimeFormatter.ISO_INSTANT)
-		);
-		// Get the request and add a header with a random uuid to it
-		exchange
-				.getRequest()
-				.mutate()
-				.header("X-Request-ID", String.valueOf(requestId));
-		return chain
-				.filter(exchange)
-				.then(Mono.fromRunnable(() -> {
-					exchange
+		if (!isAlreadyRouted(exchange)) {
+
+			// Access the headers
+			HttpHeaders headers = exchange.getRequest().getHeaders();
+			String requestId = headers.containsKey("X-Request-ID") ?
+					                   headers.getFirst("X-Request-ID") :
+					                   String.valueOf(UUID.randomUUID());
+			logger.info("Generated/Using X-Request-ID('{}') for request from {}",
+			            requestId, ZonedDateTime
+					            .now(ZoneOffset.UTC)
+					            .format(DateTimeFormatter.ISO_INSTANT)
+			);
+			// Get the request and add a header with a random uuid to it
+			ServerHttpRequest request = exchange
+					.getRequest()
+					.mutate()
+					.header("X-Request-ID", requestId)
+					.build();
+			return chain
+					.filter(exchange.mutate().request(request).build())
+					.then(Mono.fromRunnable(() -> exchange
 							.getResponse()
 							.getHeaders()
-							.add("X-Request-ID", String.valueOf(requestId));
-				}));
-
+							.set("X-Request-ID", requestId)));
+		}
+		return chain.filter(exchange);
 	}
 }
