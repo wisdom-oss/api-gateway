@@ -1,5 +1,5 @@
 # WISdoM OSS - API Gateway
-Version: 0.1-SNAPSHOT<br>
+Version: 1.0-RELEASE<br>
 Maintainer: [Jan Eike Suchard](mailto:jan.eike.suchard@uni-oldenburg.de)
 <hr>
 
