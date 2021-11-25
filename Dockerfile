@@ -9,3 +9,5 @@ EXPOSE 8090
 ENTRYPOINT ["java", "-jar", "/opt/api-gateway/api-gateway.jar"]
 ENV SPRING_PROFILES_ACTIVE=production
 ENV SERVICE_REGISTRY_HOSTNAME=service-registry
+LABEL de.uol.wisdom.oss.version="1.0-RELEASE"
+LABEL de.uol.wisdom.oss.maintainer="Jan Eike Suchard<wisdom@uol.de>"
