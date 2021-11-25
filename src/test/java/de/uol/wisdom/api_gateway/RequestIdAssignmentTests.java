@@ -281,7 +281,7 @@ public class RequestIdAssignmentTests {
 		// Create a new mocked request
 		MockServerHttpRequest mockedRequest = MockServerHttpRequest
 				.get("/")
-                .header("X-Request-ID", "blablabla")
+                 .header("X-Request-ID", String.valueOf(UUID.randomUUID()))
 				.build();
 		// Create a WebExchange with the mocked request
 		MockServerWebExchange mockedExchange = MockServerWebExchange.from(mockedRequest);
