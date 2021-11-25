@@ -37,12 +37,6 @@ spring:
           uri: lb://authorization-service
           predicates:
             - Path=/auth/**
-        - id: google
-          uri: http://google.com
-          predicates:
-            - Path=/google/**
-          metadata:
-            scope: "admin"
       default-filters:
         - RewritePath=(?<serviceId>/[^/]+)/(?<path>/?.*), /$\{path}
         - TokenRelay=
