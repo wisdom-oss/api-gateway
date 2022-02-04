@@ -1,5 +1,6 @@
 package de.uol.wisdom.api_gateway;
 
+import de.uol.wisdom.api_gateway.filters.AllowCORSForDevelopmentFilter;
 import de.uol.wisdom.api_gateway.filters.RequestIDHeaderGeneration;
 import de.uol.wisdom.api_gateway.filters.TokenValidationFilter;
 import org.springframework.boot.SpringApplication;
@@ -20,6 +21,12 @@ public class GatewayApplication {
 	}
 
 	@Bean
+	@Order(-2)
+	public GlobalFilter corsBypass() {
+		return new AllowCORSForDevelopmentFilter();
+	}
+
+	@Bean
 	@Order(-1)
 	public GlobalFilter requestIdHeaderGenerator() {
 		return new RequestIDHeaderGeneration();
@@ -31,16 +38,5 @@ public class GatewayApplication {
 		return new TokenValidationFilter();
 	}
 
-	@Bean
-	@Profile("local")
-	public CorsWebFilter corsWebFilter() {
-		CorsConfiguration configuration = new CorsConfiguration();
-		configuration.applyPermitDefaultValues();
-		configuration.addAllowedOrigin("*");
-		configuration.addAllowedMethod("*");
-		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-		source.registerCorsConfiguration("/**", configuration);
-		return new CorsWebFilter(source);
-	}
 
 }
