@@ -18,11 +18,24 @@ import java.util.UUID;
 
 import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.isAlreadyRouted;
 
+/**
+ * A Filter which will assign a random request id to every request routed by the gateway
+ */
 @Component
 public class RequestIDHeaderGeneration implements GlobalFilter {
 
+	/**
+	 * A Logger for this Filter
+	 */
 	final Logger logger = LoggerFactory.getLogger(RequestIDHeaderGeneration.class);
 
+	/**
+	 * The actual filter which is filtering the request
+	 * @param exchange The {@link ServerWebExchange} which is currently handled
+	 * @param chain A {@link GatewayFilterChain} which contains all filters which are still not
+	 *                 executed
+	 * @return The filtered exchange with the added request ID (X-Request-ID)
+	 */
 	@Override
 	public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
 		// Generate a random uuid
