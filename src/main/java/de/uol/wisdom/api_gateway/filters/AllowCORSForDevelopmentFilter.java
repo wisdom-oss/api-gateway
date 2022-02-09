@@ -15,6 +15,9 @@ import reactor.core.publisher.Mono;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+/**
+ * A {@link GlobalFilter} for allowing special CORS Requests
+ */
 public class AllowCORSForDevelopmentFilter implements GlobalFilter {
 
 	/**
