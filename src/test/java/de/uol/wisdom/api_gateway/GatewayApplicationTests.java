@@ -3,7 +3,7 @@ package de.uol.wisdom.api_gateway;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
+@SpringBootTest(properties = {"CORS_BYPASS_TOKEN=TEST_MODE"})
 class GatewayApplicationTests {
 
 	/**
