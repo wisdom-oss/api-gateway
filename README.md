@@ -16,3 +16,21 @@ communication directions (to the microservice/to the user).
 Currently, the configuration is hardcoded into the `*.jar`  files during the build
 process. However, this may change in the future. Information about this will be 
 presented here
+
+## Allowing CORS (Dangerous!!)
+
+With this development release you are able to allow CORS for special clients and environments. 
+This is done by setting the following parameters:
+
+- Environment Variable  
+Please set the following environment variable to a value of your choice: `CORS_BYPASS_TOKEN`
+
+- HTTP Request Header  
+Set the Header `X-CORS-BYPASS` to the value of the previously set environment variable
+
+After setting those two headers you should be able to work with CORS Requests
+
+> **WARNING**  
+> Sharing the values of any parameter may cause the leaking of Authorization Keys, API secrets and 
+> other sensitive information. If you are not sure if you really need this feature, please do not 
+> configure it!

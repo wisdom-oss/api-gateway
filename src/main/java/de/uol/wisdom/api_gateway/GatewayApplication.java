@@ -28,6 +28,10 @@ public class GatewayApplication {
 	}
 
 
+	/**
+	 * Activation of the {@link AllowCORSForDevelopmentFilter CORSBypassFilter}
+	 * @return A new instance of the CORS Bypass Filter
+	 */
 	@Bean
 	@Order(-2)
 	public GlobalFilter corsBypass() {
