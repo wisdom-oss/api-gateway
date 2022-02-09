@@ -16,7 +16,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@SpringBootTest(properties = "spring.profiles.active=test")
+@SpringBootTest(properties = {"spring.profiles.active=test", "CORS_BYPASS_TOKEN=TEST_MODE"})
 public class TokenValidationTests {
 
 	/**
