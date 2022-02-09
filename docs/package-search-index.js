@@ -1,0 +1,1 @@
+packageSearchIndex = [{"l":"All Packages","u":"allpackages-index.html"},{"l":"de.uol.wisdom.api_gateway"},{"l":"de.uol.wisdom.api_gateway.filters"}];updateSearchResults();

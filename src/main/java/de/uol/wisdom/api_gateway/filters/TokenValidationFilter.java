@@ -36,6 +36,9 @@ import java.util.UUID;
 import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR;
 import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.isAlreadyRouted;
 
+/**
+ * A Global Filter validating if the bearer token present is currently active and valid
+ */
 @Component
 public class TokenValidationFilter implements GlobalFilter {
 
