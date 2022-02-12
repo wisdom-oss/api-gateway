@@ -5,6 +5,7 @@ RUN mvn -f /usr/src/app/pom.xml clean package
 
 FROM amazoncorretto:17-alpine3.14
 COPY --from=build /usr/src/app/target/api-gateway-*.jar /opt/api-gateway/api-gateway.jar
+WORKDIR /opt/api-gateway/
 EXPOSE 8090
 ENTRYPOINT ["java", "-jar", "/opt/api-gateway/api-gateway.jar"]
 ENV SPRING_PROFILES_ACTIVE=production
