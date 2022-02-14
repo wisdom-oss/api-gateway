@@ -1,10 +1,10 @@
-FROM maven:3.8.4-openjdk-17 AS build
+FROM maven:3.8.4-openjdk-17 AS maven-build
 COPY src /usr/src/app/src
 COPY pom.xml /usr/src/app
-RUN mvn -f /usr/src/app/pom.xml clean package
+RUN mvn -B -f  /usr/src/app/pom.xml clean package -DskipTests
 
-FROM amazoncorretto:17-alpine3.14
-COPY --from=build /usr/src/app/target/api-gateway-*.jar /opt/api-gateway/api-gateway.jar
+FROM eclipse-temurin:17-jre-alpine
+COPY --from=maven-build /usr/src/app/target/api-gateway-*.jar /opt/api-gateway/api-gateway.jar
 WORKDIR /opt/api-gateway/
 EXPOSE 8090
 ENTRYPOINT ["java", "-jar", "/opt/api-gateway/api-gateway.jar"]
