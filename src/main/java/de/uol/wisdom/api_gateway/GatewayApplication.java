@@ -28,7 +28,7 @@ public class GatewayApplication {
 	 * @return A new instance of the filter
 	 */
 	@Bean
-	@Order(-1)
+	@Order(Integer.MIN_VALUE)
 	public GlobalFilter requestIdHeaderGenerator() {
 		return new RequestIDHeaderGeneration();
 	}
@@ -38,7 +38,7 @@ public class GatewayApplication {
 	 * @return A new instance of the {@link TokenValidationFilter}
 	 */
 	@Bean
-	@Order(0)
+	@Order(Integer.MIN_VALUE + 1)
 	public GlobalFilter AuthorizationCheck() {
 		return new TokenValidationFilter();
 	}
