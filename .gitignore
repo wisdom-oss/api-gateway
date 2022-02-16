@@ -112,3 +112,4 @@ fabric.properties
 /.idea/
 api-gateway.iml
 HELP.md
+/config/*
