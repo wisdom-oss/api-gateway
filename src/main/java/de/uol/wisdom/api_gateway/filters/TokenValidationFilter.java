@@ -156,21 +156,11 @@ public class TokenValidationFilter implements GlobalFilter {
 			String userToken = getAuthorizationToken(headers);
 			// Create a call to the authorization server with the scope needed for this route
 			try {
-				if (!tokenValidForService(userToken, routeScope)) {
-					HttpHeaders header = new HttpHeaders();
-					header.set("WWW-Authenticate", "Bearer");
-					throw new WebClientResponseException(
-							HttpStatus.UNAUTHORIZED.value(),
-							"unauthorized",
-							header,
-							null,
-							null
-					);
-				}
+				tokenValidForService(userToken, routeScope);
 			} catch (URISyntaxException e) {
 				throw new WebClientResponseException(
 						HttpStatus.INTERNAL_SERVER_ERROR.value(),
-						"no_valid_uri",
+						"invalid_uri_generated",
 						null,
 						null,
 						null
@@ -193,14 +183,20 @@ public class TokenValidationFilter implements GlobalFilter {
 	 * Check if an authorization token is valid for the scope of the route.
 	 * @param userToken Authorization Token from the Headers
 	 * @param routeScope Scope configured in the route's metadata
-	 * @return True of the token is valid else false
 	 */
-	private boolean tokenValidForService(String userToken, String routeScope) throws URISyntaxException {
+	private void tokenValidForService(String userToken, String routeScope) throws URISyntaxException {
+		WebClientResponseException e = new WebClientResponseException(
+				HttpStatus.UNAUTHORIZED.value(),
+				"invalid_token",
+				null,
+				null,
+				null
+		);
 		if (isTestMode() && userToken.equals(NIL_UUID)) {
-			return true;
+			throw e;
 		}
 		if (isTestMode()) {
-			return false;
+			throw e;
 		}
 		// Build a http string pointing to one of the active authorization service containers
 		InstanceInfo authorizationService = discoveryClient.getNextServerFromEureka(
@@ -213,7 +209,7 @@ public class TokenValidationFilter implements GlobalFilter {
 		WebClient client = WebClient.create();
 		MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
 		body.add("token", userToken);
-		ResponseEntity<String> response = client
+		client
 			.post()
 			.uri(new URI(authorizationServiceURL))
 			.header("Authorization", "Bearer " + userToken)
@@ -222,18 +218,27 @@ public class TokenValidationFilter implements GlobalFilter {
 			.body(BodyInserters.fromFormData(body))
 			.retrieve()
 			.toEntity(String.class)
-			.block();
-		if (response == null) {
-			return false;
-		}
-		if (!response.hasBody()) {
-			return false;
-		}
-		JSONObject introspectionResult = new JSONObject(response.getBody());
-		if (!introspectionResult.has("active")) {
-			return false;
-		}
-		return introspectionResult.getBoolean("active");
+			.subscribe(response -> {
+				if (response == null) {
+					throw e;
+				}
+				if (!response.hasBody()) {
+					throw new WebClientResponseException(
+							HttpStatus.INTERNAL_SERVER_ERROR.value(),
+							"no_response_content",
+							null,
+							null,
+							null
+					);
+				}
+				JSONObject introspectionResult = new JSONObject(response.getBody());
+				if (!introspectionResult.has("active")) {
+					throw e;
+				}
+				if (!introspectionResult.getBoolean("active")) {
+					throw e;
+				}
+			});
 	}
 
 	/**
