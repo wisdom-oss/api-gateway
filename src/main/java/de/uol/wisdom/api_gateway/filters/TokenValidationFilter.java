@@ -17,6 +17,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
@@ -209,15 +211,15 @@ public class TokenValidationFilter implements GlobalFilter {
 		String authorizationServiceURL =
 				"http://" + authorizationServiceIP + ":" + authorizationServicePort + CHECK_TOKEN_PATH;
 		WebClient client = WebClient.create();
-		Map<String, String> body = new HashMap<>();
-		body.put("token", userToken);
+		MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+		body.add("token", userToken);
 		ResponseEntity<String> response = client
 			.post()
 			.uri(new URI(authorizationServiceURL))
 			.header("Authorization", "Bearer " + userToken)
 			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 			.accept(MediaType.APPLICATION_JSON)
-			.body(BodyInserters.fromValue(body))
+			.body(BodyInserters.fromFormData(body))
 			.retrieve()
 			.toEntity(String.class)
 			.block();
