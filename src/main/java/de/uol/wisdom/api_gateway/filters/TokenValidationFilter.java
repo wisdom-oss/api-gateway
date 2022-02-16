@@ -2,6 +2,13 @@ package de.uol.wisdom.api_gateway.filters;
 
 import com.netflix.appinfo.InstanceInfo;
 import com.netflix.discovery.EurekaClient;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicNameValuePair;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,11 +36,11 @@ import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
 import reactor.core.publisher.Mono;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR;
 import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.isAlreadyRouted;
@@ -115,15 +122,14 @@ public class TokenValidationFilter implements GlobalFilter {
 			if (!headers.containsKey("X-Testing-Pass-ModuleCheck")) {
 				if (!authorizationServiceAvailable()) {
 					logger.warn("No instance of the authorization server could be found.");
-					HttpHeaders header = new HttpHeaders();
-					header.set("WWW-Authenticate", "Bearer");
-					throw new WebClientResponseException(
-							HttpStatus.UNAUTHORIZED.value(),
-							"unauthorized",
-							header,
-							null,
-							null
-					);
+					return Mono.fromRunnable(() -> {
+						ServerHttpResponse response = exchange.getResponse();
+						response.setStatusCode(HttpStatus.SERVICE_UNAVAILABLE);
+						exchange
+								.mutate()
+								.response(response)
+								.build();
+					});
 				}
 			}
 			// Get the route id to exempt the requests going to the auth service from the token
@@ -131,7 +137,7 @@ public class TokenValidationFilter implements GlobalFilter {
 			Route routeAttributes = exchange.getAttribute(GATEWAY_ROUTE_ATTR);
 			String routeId = routeAttributes != null ? routeAttributes.getId() : "NaN";
 			String routeScope = routeAttributes != null ?
-			                    (String) routeAttributes.getMetadata().get("scope") : "";
+					                    (String) routeAttributes.getMetadata().get("scope") : "";
 			// Try and build a string
 			PathPattern matcher = new PathPatternParser().parse("/auth/**");
 			boolean pathMatchesAuthService =
@@ -143,29 +149,26 @@ public class TokenValidationFilter implements GlobalFilter {
 			}
 
 			if (!validAuthorizationHeader(headers)) {
-				HttpHeaders header = new HttpHeaders();
-				header.set("WWW-Authenticate", "Bearer");
-				throw new WebClientResponseException(
-						HttpStatus.UNAUTHORIZED.value(),
-						"unauthorized",
-						header,
-						null,
-						null
-				);
+				return Mono.fromRunnable(() -> {
+					ServerHttpResponse response = exchange.getResponse();
+					response.setStatusCode(HttpStatus.UNAUTHORIZED);
+					exchange
+							.mutate()
+							.response(response);
+				});
 			}
 
 			String userToken = getAuthorizationToken(headers);
 			// Create a call to the authorization server with the scope needed for this route
-			try {
-				tokenValidForService(userToken, routeScope);
-			} catch (URISyntaxException e) {
-				throw new WebClientResponseException(
-						HttpStatus.INTERNAL_SERVER_ERROR.value(),
-						"invalid_uri_generated",
-						null,
-						null,
-						null
-				);
+			if (!tokenValidForService(userToken, routeScope)) {
+				return Mono.fromRunnable(() -> {
+					ServerHttpResponse response = exchange.getResponse();
+					response.setStatusCode(HttpStatus.FORBIDDEN);
+					exchange
+							.mutate()
+							.response(response)
+							.build();
+				});
 			}
 			return chain.filter(exchange);
 		}
@@ -184,15 +187,14 @@ public class TokenValidationFilter implements GlobalFilter {
 	 * Check if an authorization token is valid for the scope of the route.
 	 * @param userToken Authorization Token from the Headers
 	 * @param routeScope Scope configured in the route's metadata
+	 * @return True of the token is valid else false
 	 */
-	private void tokenValidForService(String userToken, String routeScope) throws URISyntaxException {
-		ResponseStatusException e = new ResponseStatusException(HttpStatus.UNAUTHORIZED,
-		                                                        "invalid_token");
+	private boolean tokenValidForService(String userToken, String routeScope) {
 		if (isTestMode() && userToken.equals(NIL_UUID)) {
-			throw e;
+			return true;
 		}
 		if (isTestMode()) {
-			throw e;
+			return false;
 		}
 		// Build a http string pointing to one of the active authorization service containers
 		InstanceInfo authorizationService = discoveryClient.getNextServerFromEureka(
@@ -202,41 +204,27 @@ public class TokenValidationFilter implements GlobalFilter {
 		int authorizationServicePort = authorizationService.getPort();
 		String authorizationServiceURL =
 				"http://" + authorizationServiceIP + ":" + authorizationServicePort + CHECK_TOKEN_PATH;
-		WebClient client = WebClient.create();
-		MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-		body.add("token", userToken);
-		client
-			.post()
-			.uri(new URI(authorizationServiceURL))
-			.header("Authorization", "Bearer " + userToken)
-			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
-			.accept(MediaType.APPLICATION_JSON)
-			.body(BodyInserters.fromFormData(body))
-			.retrieve()
-			.onStatus(HttpStatus::is4xxClientError, error -> {throw e;})
-			.onStatus(HttpStatus::is5xxServerError, error -> {throw e;})
-			.toEntity(String.class)
-			.subscribe(response -> {
-				if (response == null) {
-					throw e;
-				}
-				if (!response.hasBody()) {
-					throw new WebClientResponseException(
-							HttpStatus.INTERNAL_SERVER_ERROR.value(),
-							"no_response_content",
-							null,
-							null,
-							null
-					);
-				}
-				JSONObject introspectionResult = new JSONObject(response.getBody());
-				if (!introspectionResult.has("active")) {
-					throw e;
-				}
-				if (!introspectionResult.getBoolean("active")) {
-					throw e;
-				}
-			});
+		try (CloseableHttpClient client = HttpClients.createDefault()) {
+			HttpPost checkTokenRequest = new HttpPost(authorizationServiceURL);
+			List<NameValuePair> body = new ArrayList<>();
+			body.add(new BasicNameValuePair("token", userToken));
+			body.add(new BasicNameValuePair("scope", routeScope));
+			checkTokenRequest.setEntity(new UrlEncodedFormEntity(body));
+			checkTokenRequest.addHeader("Authorization", "Bearer " + userToken);
+			CloseableHttpResponse checkTokenResponse = client.execute(checkTokenRequest);
+			String responseContent = new String(
+					checkTokenResponse.getEntity().getContent().readAllBytes(),
+					StandardCharsets.UTF_8
+			);
+			JSONObject response = new JSONObject(responseContent);
+			if (response.has("active"))
+				return response.getBoolean("active");
+			else
+				return false;
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return true;
 	}
 
 	/**
