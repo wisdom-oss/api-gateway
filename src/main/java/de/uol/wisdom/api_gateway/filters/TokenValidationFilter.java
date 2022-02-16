@@ -217,6 +217,8 @@ public class TokenValidationFilter implements GlobalFilter {
 			.accept(MediaType.APPLICATION_JSON)
 			.body(BodyInserters.fromFormData(body))
 			.retrieve()
+			.onStatus(HttpStatus::is4xxClientError, error -> {throw e;})
+			.onStatus(HttpStatus::is5xxServerError, error -> {throw e;})
 			.toEntity(String.class)
 			.subscribe(response -> {
 				if (response == null) {
