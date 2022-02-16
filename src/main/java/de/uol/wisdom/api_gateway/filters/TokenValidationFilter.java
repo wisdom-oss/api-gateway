@@ -2,13 +2,6 @@ package de.uol.wisdom.api_gateway.filters;
 
 import com.netflix.appinfo.InstanceInfo;
 import com.netflix.discovery.EurekaClient;
-import org.apache.http.NameValuePair;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.message.BasicNameValuePair;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,18 +12,24 @@ import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
 import reactor.core.publisher.Mono;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR;
@@ -113,14 +112,15 @@ public class TokenValidationFilter implements GlobalFilter {
 			if (!headers.containsKey("X-Testing-Pass-ModuleCheck")) {
 				if (!authorizationServiceAvailable()) {
 					logger.warn("No instance of the authorization server could be found.");
-					return Mono.fromRunnable(() -> {
-						ServerHttpResponse response = exchange.getResponse();
-						response.setStatusCode(HttpStatus.SERVICE_UNAVAILABLE);
-						exchange
-								.mutate()
-								.response(response)
-								.build();
-					});
+					HttpHeaders header = new HttpHeaders();
+					header.set("WWW-Authenticate", "Bearer");
+					throw new WebClientResponseException(
+							HttpStatus.UNAUTHORIZED.value(),
+							"unauthorized",
+							header,
+							null,
+							null
+					);
 				}
 			}
 			// Get the route id to exempt the requests going to the auth service from the token
@@ -140,26 +140,39 @@ public class TokenValidationFilter implements GlobalFilter {
 			}
 
 			if (!validAuthorizationHeader(headers)) {
-				return Mono.fromRunnable(() -> {
-					ServerHttpResponse response = exchange.getResponse();
-					response.setStatusCode(HttpStatus.UNAUTHORIZED);
-					exchange
-							.mutate()
-							.response(response);
-				});
+				HttpHeaders header = new HttpHeaders();
+				header.set("WWW-Authenticate", "Bearer");
+				throw new WebClientResponseException(
+						HttpStatus.UNAUTHORIZED.value(),
+						"unauthorized",
+						header,
+						null,
+						null
+				);
 			}
 
 			String userToken = getAuthorizationToken(headers);
 			// Create a call to the authorization server with the scope needed for this route
-			if (!tokenValidForService(userToken, routeScope)) {
-				return Mono.fromRunnable(() -> {
-					ServerHttpResponse response = exchange.getResponse();
-					response.setStatusCode(HttpStatus.FORBIDDEN);
-					exchange
-							.mutate()
-							.response(response)
-							.build();
-				});
+			try {
+				if (!tokenValidForService(userToken, routeScope)) {
+					HttpHeaders header = new HttpHeaders();
+					header.set("WWW-Authenticate", "Bearer");
+					throw new WebClientResponseException(
+							HttpStatus.UNAUTHORIZED.value(),
+							"unauthorized",
+							header,
+							null,
+							null
+					);
+				}
+			} catch (URISyntaxException e) {
+				throw new WebClientResponseException(
+						HttpStatus.INTERNAL_SERVER_ERROR.value(),
+						"no_valid_uri",
+						null,
+						null,
+						null
+				);
 			}
 			return chain.filter(exchange);
 		}
@@ -180,7 +193,7 @@ public class TokenValidationFilter implements GlobalFilter {
 	 * @param routeScope Scope configured in the route's metadata
 	 * @return True of the token is valid else false
 	 */
-	private boolean tokenValidForService(String userToken, String routeScope) {
+	private boolean tokenValidForService(String userToken, String routeScope) throws URISyntaxException {
 		if (isTestMode() && userToken.equals(NIL_UUID)) {
 			return true;
 		}
@@ -195,24 +208,30 @@ public class TokenValidationFilter implements GlobalFilter {
 		int authorizationServicePort = authorizationService.getPort();
 		String authorizationServiceURL =
 				"http://" + authorizationServiceIP + ":" + authorizationServicePort + CHECK_TOKEN_PATH;
-		try (CloseableHttpClient client = HttpClients.createDefault()) {
-			HttpPost checkTokenRequest = new HttpPost(authorizationServiceURL);
-			List<NameValuePair> body = new ArrayList<>();
-			body.add(new BasicNameValuePair("token", userToken));
-			body.add(new BasicNameValuePair("scope", routeScope));
-			checkTokenRequest.setEntity(new UrlEncodedFormEntity(body));
-			checkTokenRequest.addHeader("Authorization", "Bearer " + userToken);
-			CloseableHttpResponse checkTokenResponse = client.execute(checkTokenRequest);
-			String responseContent = new String(
-					checkTokenResponse.getEntity().getContent().readAllBytes(),
-					StandardCharsets.UTF_8
-			);
-			JSONObject response = new JSONObject(responseContent);
-			return response.getBoolean("active");
-		} catch (IOException e) {
-			e.printStackTrace();
+		WebClient client = WebClient.create();
+		Map<String, String> body = new HashMap<>();
+		body.put("token", userToken);
+		ResponseEntity<String> response = client
+			.post()
+			.uri(new URI(authorizationServiceURL))
+			.header("Authorization", "Bearer " + userToken)
+			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+			.accept(MediaType.APPLICATION_JSON)
+			.body(BodyInserters.fromValue(body))
+			.retrieve()
+			.toEntity(String.class)
+			.block();
+		if (response == null) {
+			return false;
 		}
-		return true;
+		if (!response.hasBody()) {
+			return false;
+		}
+		JSONObject introspectionResult = new JSONObject(response.getBody());
+		if (!introspectionResult.has("active")) {
+			return false;
+		}
+		return introspectionResult.getBoolean("active");
 	}
 
 	/**
