@@ -23,6 +23,7 @@ import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
@@ -185,13 +186,8 @@ public class TokenValidationFilter implements GlobalFilter {
 	 * @param routeScope Scope configured in the route's metadata
 	 */
 	private void tokenValidForService(String userToken, String routeScope) throws URISyntaxException {
-		WebClientResponseException e = new WebClientResponseException(
-				HttpStatus.UNAUTHORIZED.value(),
-				"invalid_token",
-				null,
-				null,
-				null
-		);
+		ResponseStatusException e = new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+		                                                        "invalid_token");
 		if (isTestMode() && userToken.equals(NIL_UUID)) {
 			throw e;
 		}
