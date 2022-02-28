@@ -70,7 +70,7 @@
                 <version>2.9</version>
                 <configuration>
                     <reportOutputDirectory>./</reportOutputDirectory>
-                    <destDir>./docs</destDir>
+                    <destDir>static_docs</destDir>
                     <additionalparam>-d docs/</additionalparam>
                     <useStandardDocletOptions>true</useStandardDocletOptions>
                 </configuration>
