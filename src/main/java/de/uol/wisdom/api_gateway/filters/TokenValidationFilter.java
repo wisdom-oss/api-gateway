@@ -19,28 +19,19 @@ import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.reactive.function.BodyInserters;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientRequestException;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
 import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR;
 import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.isAlreadyRouted;
@@ -136,8 +127,6 @@ public class TokenValidationFilter implements GlobalFilter {
 			// check or the uri of the route points to the authorization service
 			Route routeAttributes = exchange.getAttribute(GATEWAY_ROUTE_ATTR);
 			String routeId = routeAttributes != null ? routeAttributes.getId() : "NaN";
-			String routeScope = routeAttributes != null ?
-					                    (String) routeAttributes.getMetadata().get("scope") : "";
 			// Try and build a string
 			PathPattern matcher = new PathPatternParser().parse("/auth/**");
 			boolean pathMatchesAuthService =
@@ -160,10 +149,10 @@ public class TokenValidationFilter implements GlobalFilter {
 
 			String userToken = getAuthorizationToken(headers);
 			// Create a call to the authorization server with the scope needed for this route
-			if (!tokenValidForService(userToken, routeScope)) {
+			if (!tokenValid(userToken)) {
 				return Mono.fromRunnable(() -> {
 					ServerHttpResponse response = exchange.getResponse();
-					response.setStatusCode(HttpStatus.FORBIDDEN);
+					response.setStatusCode(HttpStatus.UNAUTHORIZED);
 					exchange
 							.mutate()
 							.response(response)
@@ -186,10 +175,9 @@ public class TokenValidationFilter implements GlobalFilter {
 	/**
 	 * Check if an authorization token is valid for the scope of the route.
 	 * @param userToken Authorization Token from the Headers
-	 * @param routeScope Scope configured in the route's metadata
 	 * @return True of the token is valid else false
 	 */
-	private boolean tokenValidForService(String userToken, String routeScope) {
+	private boolean tokenValid(String userToken) {
 		if (isTestMode() && userToken.equals(NIL_UUID)) {
 			return true;
 		}
@@ -208,7 +196,6 @@ public class TokenValidationFilter implements GlobalFilter {
 			HttpPost checkTokenRequest = new HttpPost(authorizationServiceURL);
 			List<NameValuePair> body = new ArrayList<>();
 			body.add(new BasicNameValuePair("token", userToken));
-			body.add(new BasicNameValuePair("scope", routeScope));
 			checkTokenRequest.setEntity(new UrlEncodedFormEntity(body));
 			checkTokenRequest.addHeader("Authorization", "Bearer " + userToken);
 			CloseableHttpResponse checkTokenResponse = client.execute(checkTokenRequest);
