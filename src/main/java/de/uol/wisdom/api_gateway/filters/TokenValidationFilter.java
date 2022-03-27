@@ -127,8 +127,6 @@ public class TokenValidationFilter implements GlobalFilter {
 			// check or the uri of the route points to the authorization service
 			Route routeAttributes = exchange.getAttribute(GATEWAY_ROUTE_ATTR);
 			String routeId = routeAttributes != null ? routeAttributes.getId() : "NaN";
-			String routeScope = routeAttributes != null ?
-			                    (String) routeAttributes.getMetadata().get("scope") : "";
 			// Try and build a string
 			PathPattern matcher = new PathPatternParser().parse("/auth/**");
 			boolean pathMatchesAuthService =
@@ -151,10 +149,10 @@ public class TokenValidationFilter implements GlobalFilter {
 
 			String userToken = getAuthorizationToken(headers);
 			// Create a call to the authorization server with the scope needed for this route
-			if (!tokenValidForService(userToken, routeScope)) {
+			if (!tokenValid(userToken)) {
 				return Mono.fromRunnable(() -> {
 					ServerHttpResponse response = exchange.getResponse();
-					response.setStatusCode(HttpStatus.FORBIDDEN);
+					response.setStatusCode(HttpStatus.UNAUTHORIZED);
 					exchange
 							.mutate()
 							.response(response)
@@ -177,10 +175,9 @@ public class TokenValidationFilter implements GlobalFilter {
 	/**
 	 * Check if an authorization token is valid for the scope of the route.
 	 * @param userToken Authorization Token from the Headers
-	 * @param routeScope Scope configured in the route's metadata
 	 * @return True of the token is valid else false
 	 */
-	private boolean tokenValidForService(String userToken, String routeScope) {
+	private boolean tokenValid(String userToken) {
 		if (isTestMode() && userToken.equals(NIL_UUID)) {
 			return true;
 		}
@@ -199,7 +196,6 @@ public class TokenValidationFilter implements GlobalFilter {
 			HttpPost checkTokenRequest = new HttpPost(authorizationServiceURL);
 			List<NameValuePair> body = new ArrayList<>();
 			body.add(new BasicNameValuePair("token", userToken));
-			body.add(new BasicNameValuePair("scope", routeScope));
 			checkTokenRequest.setEntity(new UrlEncodedFormEntity(body));
 			checkTokenRequest.addHeader("Authorization", "Bearer " + userToken);
 			CloseableHttpResponse checkTokenResponse = client.execute(checkTokenRequest);
