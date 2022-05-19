@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 
@@ -31,6 +32,17 @@ public class GlobalErrorAttributes extends DefaultErrorAttributes {
 		HttpStatus status = HttpStatus.valueOf((Integer) map.get("status"));
 		// Set the generated Request ID as error
 		map.remove("requestId");
+		Map<String, Object> errorData = new LinkedHashMap<>();
+		errorData.put("httpCode", status.value());
+		StringBuilder httpErrorName = new StringBuilder(status.name());
+		String httpErrorNameSpaced = httpErrorName.toString().replace('_', ' ');
+		httpErrorName = new StringBuilder();
+		for (String part: httpErrorNameSpaced.split("\\s")) {
+			String firstLetter = part.substring(0,1);
+			String rest = part.substring(1);
+			httpErrorName.append(firstLetter.toUpperCase()).append(rest.toLowerCase()).append(" ");
+		}
+		errorData.put("httpError", httpErrorName.toString().trim());
 		if (status == HttpStatus.INTERNAL_SERVER_ERROR) {
 			map.put("error", "internal_gateway_error");
 			map.put("message", "The Gateway experienced an internal error, which is not specified" +

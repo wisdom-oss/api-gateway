@@ -1,7 +1,6 @@
 package de.uol.wisdom.api_gateway;
 
 
-import de.uol.wisdom.api_gateway.filters.RequestIDHeaderGeneration;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
