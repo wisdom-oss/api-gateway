@@ -1,7 +1,7 @@
 package de.uol.wisdom.api_gateway;
 
 import org.json.JSONObject;
-import org.springframework.amqp.core.FanoutExchange;
+import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +18,7 @@ public class AuthorizationClient {
     private RabbitTemplate template;
 
     @Autowired
-    private FanoutExchange exchange;
+    private DirectExchange exchange;
 
     int start = 0;
 
@@ -28,7 +28,7 @@ public class AuthorizationClient {
         request.put("action", "validate_token");
         request.put("scope", "");
         CorrelationData data = new CorrelationData(UUID.randomUUID().toString());
-        LinkedHashMap response = (LinkedHashMap) template.convertSendAndReceive(exchange.getName(), "", request.toMap(), data);
+        LinkedHashMap response = (LinkedHashMap) template.convertSendAndReceive(exchange.getName(), "authorization-service", request.toMap(), data);
         JSONObject result = new JSONObject(response);
         if (!result.has("active")) {
             throw new CustomResponseStatusException(
@@ -49,48 +49,42 @@ public class AuthorizationClient {
             }
             String reason = result.getString("reason");
             switch (reason) {
-                case "INVALID_TOKEN":
-                    throw new CustomResponseStatusException(
-                            HttpStatus.UNAUTHORIZED,
-                            "INVALID_TOKEN",
-                            "Invalid Access Token",
-                            "The access token used to access this resource is either malformed or non-existent"
-                    );
-                case "EXPIRED_TOKEN":
-                    throw new CustomResponseStatusException(
-                            HttpStatus.UNAUTHORIZED,
-                            "EXPIRED_TOKEN",
-                            "Expired Access Token",
-                            "The access token used to access this resource is expired"
-                    );
-                case "USAGE_BEFORE_CREATION":
-                    throw new CustomResponseStatusException(
-                            HttpStatus.UNAUTHORIZED,
-                            reason,
-                            "Token used before creation",
-                            "The access token used to access this resource was used before it's creation time"
-                    );
-                case "NO_USER_ASSOCIATED":
-                    throw new CustomResponseStatusException(
-                            HttpStatus.FORBIDDEN,
-                            reason,
-                            "No user found",
-                            "The access token used to access this resource has not user associated to it"
-                    );
-                case "USER_DISABLED":
-                    throw new CustomResponseStatusException(
-                            HttpStatus.FORBIDDEN,
-                            reason,
-                            "User disabled",
-                            "The user account used to access this resource currently is disabled"
-                    );
-                default:
-                    throw new CustomResponseStatusException(
-                            HttpStatus.UNAUTHORIZED,
-                            reason,
-                            "Unauthorized",
-                            "The access token used to access this resource is not valid"
-                    );
+                case "INVALID_TOKEN" -> throw new CustomResponseStatusException(
+                        HttpStatus.UNAUTHORIZED,
+                        "INVALID_TOKEN",
+                        "Invalid Access Token",
+                        "The access token used to access this resource is either malformed or non-existent"
+                );
+                case "EXPIRED_TOKEN" -> throw new CustomResponseStatusException(
+                        HttpStatus.UNAUTHORIZED,
+                        "EXPIRED_TOKEN",
+                        "Expired Access Token",
+                        "The access token used to access this resource is expired"
+                );
+                case "USAGE_BEFORE_CREATION" -> throw new CustomResponseStatusException(
+                        HttpStatus.UNAUTHORIZED,
+                        reason,
+                        "Token used before creation",
+                        "The access token used to access this resource was used before it's creation time"
+                );
+                case "NO_USER_ASSOCIATED" -> throw new CustomResponseStatusException(
+                        HttpStatus.FORBIDDEN,
+                        reason,
+                        "No user found",
+                        "The access token used to access this resource has not user associated to it"
+                );
+                case "USER_DISABLED" -> throw new CustomResponseStatusException(
+                        HttpStatus.FORBIDDEN,
+                        reason,
+                        "User disabled",
+                        "The user account used to access this resource currently is disabled"
+                );
+                default -> throw new CustomResponseStatusException(
+                        HttpStatus.UNAUTHORIZED,
+                        reason,
+                        "Unauthorized",
+                        "The access token used to access this resource is not valid"
+                );
             }
         }
     }

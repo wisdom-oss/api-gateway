@@ -57,9 +57,15 @@ public class GlobalWebExceptionHandler extends AbstractErrorWebExceptionHandler 
 	 */
 	private Mono<ServerResponse> renderErrorResponse(ServerRequest request) {
 		Map<String, Object> errorProperties = getErrorAttributes(request,
-		                                                         ErrorAttributeOptions.defaults());
+		                                                         ErrorAttributeOptions.of(
+																		 ErrorAttributeOptions.Include.EXCEPTION,
+																		 ErrorAttributeOptions.Include.MESSAGE,
+																		 ErrorAttributeOptions.Include.BINDING_ERRORS,
+																		 ErrorAttributeOptions.Include.STACK_TRACE
+																 )
+		);
 
-		return ServerResponse.status(HttpStatus.valueOf((Integer) errorProperties.get("status")))
+		return ServerResponse.status(HttpStatus.valueOf((Integer) errorProperties.get("httpCode")))
 				       .contentType(MediaType.APPLICATION_JSON)
 				       .body(BodyInserters.fromValue(errorProperties));
 	}

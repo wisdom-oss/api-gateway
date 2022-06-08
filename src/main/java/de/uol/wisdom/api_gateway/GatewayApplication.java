@@ -1,5 +1,6 @@
 package de.uol.wisdom.api_gateway;
 
+import de.uol.wisdom.api_gateway.filters.ServiceAvailabilityFilter;
 import de.uol.wisdom.api_gateway.filters.TokenValidationFilter;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -31,6 +32,10 @@ public class GatewayApplication {
 	public GlobalFilter AuthorizationCheck() {
 		return new TokenValidationFilter();
 	}
+
+	@Bean
+	@Order(Integer.MIN_VALUE)
+	public GlobalFilter ServiceCheck() { return new ServiceAvailabilityFilter(); }
 
 
 }

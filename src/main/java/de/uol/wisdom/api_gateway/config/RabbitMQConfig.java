@@ -1,6 +1,7 @@
 package de.uol.wisdom.api_gateway.config;
 
 import de.uol.wisdom.api_gateway.AuthorizationClient;
+import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.FanoutExchange;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,8 +15,8 @@ public class RabbitMQConfig {
     private String authorization_exchange;
 
     @Bean
-    public FanoutExchange exchange() {
-        return new FanoutExchange(authorization_exchange, false, false);
+    public DirectExchange exchange() {
+        return new DirectExchange(authorization_exchange, false, false);
     }
 
     @Bean

@@ -30,36 +30,28 @@ public class GlobalErrorAttributes extends DefaultErrorAttributes {
 	                                              ErrorAttributeOptions options) {
 		Map<String, Object> map = super.getErrorAttributes(request, options);
 		HttpStatus status = HttpStatus.valueOf((Integer) map.get("status"));
-		// Set the generated Request ID as error
-		map.remove("requestId");
 		Map<String, Object> errorData = new LinkedHashMap<>();
 		errorData.put("httpCode", status.value());
-		StringBuilder httpErrorName = new StringBuilder(status.name());
-		String httpErrorNameSpaced = httpErrorName.toString().replace('_', ' ');
-		httpErrorName = new StringBuilder();
-		for (String part: httpErrorNameSpaced.split("\\s")) {
-			String firstLetter = part.substring(0,1);
-			String rest = part.substring(1);
-			httpErrorName.append(firstLetter.toUpperCase()).append(rest.toLowerCase()).append(" ");
-		}
-		errorData.put("httpError", httpErrorName.toString().trim());
+		errorData.put("httpError", status.getReasonPhrase());
 		if (status == HttpStatus.INTERNAL_SERVER_ERROR) {
-			map.put("error", "internal_gateway_error");
-			map.put("message", "The Gateway experienced an internal error, which is not specified" +
-					                   " further");
+			errorData.put("error", "gateway.INTERNAL_ERROR");
+			errorData.put("errorName", "Internal Error");
+			errorData.put("errorDescription", map.get("exception").toString().concat(" - ").concat(map.get("message").toString()));
 		} else if (status == HttpStatus.SERVICE_UNAVAILABLE) {
-			map.put("error", "no_service_instance_present");
-			map.put("message", "There is no instance of the requested service present.");
+			errorData.put("error", "gateway.NO_SERVICE_INSTANCE");
+			errorData.put("errorName", "No active service instance");
+			errorData.put("errorDescription", "The requested service is configured, but no instance reports the status 'UP'");
 		} else if (status == HttpStatus.BAD_GATEWAY) {
-			map.put("error", "unable_to_route_request");
-			map.put("message", "There is a instance of the requested service present, but the " +
+			errorData.put("error", "gateway.ROUTING_ERROR");
+			errorData.put("errorName", "Request Routing Error");
+			errorData.put("errorDescription", "There is a instance of the requested service present, but the " +
 					                   "instance did not answer or has problems by it self");
 		} else if (status == HttpStatus.NOT_FOUND) {
-			map.put("error", "service_not_configured");
-			map.put("message", "The requested service is not configured in the gateway");
-			map.put("status", 501);
+			errorData.put("error", "gateway.SERVICE_NOT_CONFIGURED");
+			errorData.put("errorName", "Service not set up");
+			errorData.put("errorDescription", "The requested service is not configured in the gateway");
 		}
-		return map;
+		return errorData;
 	}
 
 }
