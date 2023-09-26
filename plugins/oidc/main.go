@@ -33,19 +33,15 @@ func init() {
 		if err != nil {
 			fmt.Println(err.Error())
 			useRedis = false
-			goto redisInfoLog
+			return
 		}
 		redisClient = redis.NewClient(connectionOptions)
 		err = redisClient.Ping(context.Background()).Err()
 		if err != nil {
 			fmt.Println(err.Error())
 			useRedis = false
-			goto redisInfoLog
+			return
 		}
-	}
-redisInfoLog:
-	if !useRedis {
-		fmt.Println("redis disabled")
 	}
 }
 
