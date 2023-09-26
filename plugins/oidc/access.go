@@ -199,7 +199,10 @@ func (c *Configuration) Access(kong *pdk.PDK) {
 		return
 	}
 	// now convert them into a string array
-	groups := groupsInterface.([]string)
+	var groups []string
+	for _, group := range groupsInterface.([]interface{}) {
+		groups = append(groups, group.(string))
+	}
 
 	// now join the groups together
 	groupString := strings.Join(groups, ",")
