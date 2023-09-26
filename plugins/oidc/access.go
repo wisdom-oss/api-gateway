@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -241,6 +242,24 @@ func (c *Configuration) Access(kong *pdk.PDK) {
 
 	// now join the groups together
 	groupString := strings.Join(groups, ",")
+
+	// now check if the userinfo response contains the staff marker
+	staffString, isSet := userinfo["staff"].(string)
+	if !isSet {
+		kong.ServiceRequest.SetHeader("X-Is-Staff", "false")
+	} else {
+		// try to parse the staff string into a boolean
+		isStaff, err := strconv.ParseBool(staffString)
+		if err != nil {
+			kong.ServiceRequest.SetHeader("X-Is-Staff", "false")
+
+		}
+		if isStaff {
+			kong.ServiceRequest.SetHeader("X-Is-Staff", "true")
+		} else {
+			kong.ServiceRequest.SetHeader("X-Is-Staff", "false")
+		}
+	}
 
 	// now add the headers to the downstream request, which set the groups
 	kong.ServiceRequest.SetHeader("X-WISdoM-User", username)

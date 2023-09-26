@@ -10,6 +10,7 @@ USER root
 COPY --from=plugin-build /plugins /usr/local/bin/
 USER kong
 ENV KONG_PLUGINSERVER_NAMES=oidc
+ENV KONG_PLUGINSERVER_OIDC_START_CMD="/usr/local/bin/oidc"
 ENV KONG_PLUGINSERVER_OIDC_QUERY_CMD="/usr/local/bin/oidc -dump"
 ENTRYPOINT ["/docker-entrypoint.sh"]
 EXPOSE 8000 8443 8001 8444
