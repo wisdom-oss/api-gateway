@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Kong/go-pdk"
-	"github.com/Kong/go-pdk/log"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"io"
@@ -17,13 +16,12 @@ import (
 
 var headerRegex = regexp.MustCompile(`^(\w+) (\S+)$`)
 
-var logger = log.Log{}
-
 // Access is executed every time the kong gateway receives a request. Since the
 // plugin may be restarted at any moment
 func (c *Configuration) Access(kong *pdk.PDK) {
 	// access the request and get the authorization header
 	request := kong.Request
+	logger := kong.Log
 	logger.Info("authenticating new request")
 	logger.Debug("extracting authorization header and its values")
 	authorizationHeader, _ := request.GetHeader("Authorization")
