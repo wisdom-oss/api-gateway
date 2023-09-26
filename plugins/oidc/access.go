@@ -4,15 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/Kong/go-pdk"
-	"github.com/lestrrat-go/jwx/v2/jwk"
-	"github.com/lestrrat-go/jwx/v2/jwt"
 	"io"
 	"net/http"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/Kong/go-pdk"
+	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
 var headerRegex = regexp.MustCompile(`^(\w+) (\S+)$`)
@@ -247,21 +248,27 @@ func (c *Configuration) Access(kong *pdk.PDK) {
 	staffString, isSet := userinfo["staff"].(string)
 	if !isSet {
 		kong.ServiceRequest.SetHeader("X-Is-Staff", "false")
+		kong.ServiceRequest.SetHeader("X-Superuser", "false")
 	} else {
 		// try to parse the staff string into a boolean
 		isStaff, err := strconv.ParseBool(staffString)
 		if err != nil {
 			kong.ServiceRequest.SetHeader("X-Is-Staff", "false")
+			kong.ServiceRequest.SetHeader("X-Superuser", "false")
 
 		}
 		if isStaff {
 			kong.ServiceRequest.SetHeader("X-Is-Staff", "true")
+			kong.ServiceRequest.SetHeader("X-Superuser", "true")
 		} else {
 			kong.ServiceRequest.SetHeader("X-Is-Staff", "false")
+			kong.ServiceRequest.SetHeader("X-Superuser", "false")
 		}
 	}
 
 	// now add the headers to the downstream request, which set the groups
 	kong.ServiceRequest.SetHeader("X-WISdoM-User", username)
+	kong.ServiceRequest.SetHeader("X-Authenticated-User", username)
 	kong.ServiceRequest.SetHeader("X-WISdoM-Groups", groupString)
+	kong.ServiceRequest.SetHeader("X-Authenticated-Groups", groupString)
 }
