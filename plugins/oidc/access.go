@@ -65,7 +65,7 @@ func (c *Configuration) Access(kong *pdk.PDK) {
 	// now try to get the JWKS from the specified endpoint if it has not been
 	// downloaded to the disk already
 	var jwksFile *os.File
-	_, err := os.Open("/tmp/jwks.json")
+	jwksFile, err := os.Open("/tmp/jwks.json")
 	if os.IsNotExist(err) {
 		// since the file does not exist, download the jwks and store it in the
 		// file
@@ -90,15 +90,6 @@ func (c *Configuration) Access(kong *pdk.PDK) {
 			response.WrapError(err, kong)
 			return
 		}
-		jwksFile.Close()
-	}
-	// now open the file containing the jwks
-	jwksFile, err = os.Open("/tmp/jwks.json")
-	defer jwksFile.Close()
-	if err != nil {
-		response := GatewayError{}
-		response.WrapError(err, kong)
-		return
 	}
 	// now read the jwks file
 	jwks, err := jwk.ParseReader(jwksFile)
@@ -200,13 +191,15 @@ func (c *Configuration) Access(kong *pdk.PDK) {
 		return
 	}
 
-	groups, isSet := userinfo["groups"].([]string)
+	groupsInterface, isSet := userinfo["groups"]
 	if !isSet {
 		err := errors.New("userinfo missing 'groups'")
 		response := GatewayError{}
 		response.WrapError(err, kong)
 		return
 	}
+	// now convert them into a string array
+	groups := groupsInterface.([]string)
 
 	// now join the groups together
 	groupString := strings.Join(groups, ",")
