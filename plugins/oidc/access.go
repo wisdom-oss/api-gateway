@@ -65,11 +65,11 @@ func (c *Configuration) Access(kong *pdk.PDK) {
 	// now try to get the JWKS from the specified endpoint if it has not been
 	// downloaded to the disk already
 	var jwksFile *os.File
-	_, err := os.Open("jwks.json")
+	_, err := os.Open("/tmp/jwks.json")
 	if os.IsNotExist(err) {
 		// since the file does not exist, download the jwks and store it in the
 		// file
-		jwksFile, err = os.Create("jwks.json")
+		jwksFile, err = os.Create("/tmp/jwks.json")
 		if err != nil {
 			response := GatewayError{}
 			response.WrapError(err, kong)
@@ -93,7 +93,8 @@ func (c *Configuration) Access(kong *pdk.PDK) {
 		jwksFile.Close()
 	}
 	// now open the file containing the jwks
-	jwksFile, err = os.Open("jwks.json")
+	jwksFile, err = os.Open("/tmp/jwks.json")
+	defer jwksFile.Close()
 	if err != nil {
 		response := GatewayError{}
 		response.WrapError(err, kong)
