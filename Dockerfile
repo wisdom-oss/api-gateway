@@ -12,8 +12,10 @@ USER kong
 ENV KONG_PLUGINSERVER_NAMES=oidc
 ENV KONG_PLUGINSERVER_OIDC_START_CMD="/usr/local/bin/oidc"
 ENV KONG_PLUGINSERVER_OIDC_QUERY_CMD="/usr/local/bin/oidc -dump"
+ENV KONG_PROXY_LISTEN="0.0.0.0:8000 http2 reuseport backlog=16384"
+ENV KONG_ADMIN_LISTEN="0.0.0.0:8001 http2 reuseport backlog=16384"
 ENTRYPOINT ["/docker-entrypoint.sh"]
-EXPOSE 8000 8443 8001 8444
+EXPOSE 8000 8001
 STOPSIGNAL SIGQUIT
 HEALTHCHECK --interval=10s --timeout=10s --retries=10 CMD kong health
 CMD ["kong", "docker-start"]
