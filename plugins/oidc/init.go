@@ -33,7 +33,7 @@ func init() {
 	UserinfoEndpoint = oidcConfiguration["userinfo_endpoint"].(string)
 	JWKSUrl = oidcConfiguration["jwks_uri"].(string)
 	// now download the jwks used to sign the access tokens
-	JWKSCache = jwk.NewCache(context.Background(), nil)
+	JWKSCache = jwk.NewCache(context.Background())
 	err = JWKSCache.Register(JWKSUrl)
 	if err != nil {
 		log.Fatal("unable to register JWKS URL in JWKSCache")
