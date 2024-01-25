@@ -38,6 +38,13 @@ func init() {
 	if err != nil {
 		log.Fatal("unable to register JWKS URL in JWKSCache")
 	}
+	jwks, err := JWKSCache.Refresh(context.Background(), JWKSUrl)
+	if err != nil {
+		log.Fatal("unable to refresh JWKS in cache")
+	}
+	if jwks == nil {
+		log.Fatal("returned non-existent jwks")
+	}
 
 	// now get the Client ID
 	OIDC_ClientID, isSet = os.LookupEnv("OIDC_CLIENT_ID")
