@@ -1,9 +1,6 @@
 package main
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/Kong/go-pdk/server"
 )
 
@@ -16,9 +13,5 @@ func New() interface{} {
 }
 
 func main() {
-	err := server.StartServer(New, version, priority)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	server.StartServer(New, version, priority)
 }
