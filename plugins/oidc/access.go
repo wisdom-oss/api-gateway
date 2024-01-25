@@ -1,18 +1,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"net/http"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/Kong/go-pdk"
-	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
@@ -69,83 +66,42 @@ func (c *Configuration) Access(kong *pdk.PDK) {
 	}
 	logger.Debug("validated authorization method")
 
-	// now try to get the JWKS from the specified endpoint if it has not been
-	// downloaded to the disk already
-	logger.Debug("checking for jwks file")
-	var jwksFile *os.File
-	jwksFile, err := os.OpenFile("/tmp/jwks.json", os.O_RDWR|os.O_CREATE, 0666)
-	if err != nil {
-		logger.Err("error while opening jwks file", err)
-		response := GatewayError{}
-		response.WrapError(err, kong)
-		return
-	}
-	fileStats, err := jwksFile.Stat()
-	if err != nil {
-		logger.Err("error while getting jwks file stats", err)
-		response := GatewayError{}
-		response.WrapError(err, kong)
-		return
-	}
-	if fileStats.Size() == 0 {
-		// now get the configuration and request the jwks from the idp
-		logger.Info("downloading jwks file from idp")
-		idpResponse, err := http.Get(c.JWKSEndpoint)
-		if err != nil {
-			logger.Err("error while requesting jwks data from idp", err)
-			response := GatewayError{}
-			response.WrapError(err, kong)
-			return
-		}
-
-		// now write the idp response into the file
-		_, err = io.Copy(jwksFile, idpResponse.Body)
-		if err != nil {
-			logger.Err("error while writing jwks data to file", err)
-			response := GatewayError{}
-			response.WrapError(err, kong)
-			return
-		}
-	}
-	logger.Debug("parsing jwks data")
-	// now read the jwks file
-	jwks, err := jwk.ParseReader(jwksFile)
-	if err != nil {
-		logger.Err("unable to parse jwks from file", err)
-		response := GatewayError{}
-		response.WrapError(err, kong)
-		return
-	}
-
 	// now take the extracted token and parse it using the jwks and validate it
 	logger.Debug("parsing and validating jwt from headers")
-	accessToken, err := jwt.ParseString(token, jwt.WithKeySet(jwks), jwt.WithAudience(c.ClientID))
+	jwks, err := JWKSCache.Get(context.Background(), JWKSUrl)
+	if err != nil {
+		logger.Err("error while getting jwks", err)
+		response := GatewayError{}
+		response.WrapError(err, kong)
+		return
+	}
+	accessToken, err := jwt.ParseString(token, jwt.WithKeySet(jwks), jwt.WithAudience(OIDC_ClientID), jwt.WithValidate(true))
 	if err != nil {
 		// prepare an error response
 		response := GatewayError{}
-		switch err {
-		case jwt.ErrTokenExpired():
+		switch {
+		case errors.Is(err, jwt.ErrTokenExpired()):
 			response.ErrorCode = "gateway.TOKEN_EXPIRED"
 			response.ErrorTitle = "Access Token Expired"
 			response.ErrorDescription = "The access token in the 'Authorization' header has expired"
 			response.HttpStatusCode = http.StatusUnauthorized
 			response.HttpStatusText = http.StatusText(response.HttpStatusCode)
 			break
-		case jwt.ErrInvalidIssuedAt():
+		case errors.Is(err, jwt.ErrInvalidIssuedAt()):
 			response.ErrorCode = "gateway.TOKEN_ISSUED_IN_FUTURE"
 			response.ErrorTitle = "Access Token Issued In Future"
 			response.ErrorDescription = "The access token in the 'Authorization' header has been issued in the future"
 			response.HttpStatusCode = http.StatusUnauthorized
 			response.HttpStatusText = http.StatusText(response.HttpStatusCode)
 			break
-		case jwt.ErrTokenNotYetValid():
+		case errors.Is(err, jwt.ErrTokenNotYetValid()):
 			response.ErrorCode = "gateway.TOKEN_USED_TOO_EARLY"
 			response.ErrorTitle = "Access Token Used Too Early"
 			response.ErrorDescription = "The access token in the 'Authorization' header is not valid yet. please try again later"
 			response.HttpStatusCode = http.StatusUnauthorized
 			response.HttpStatusText = http.StatusText(response.HttpStatusCode)
 			break
-		case jwt.ErrInvalidAudience():
+		case errors.Is(err, jwt.ErrInvalidAudience()):
 			response.ErrorCode = "gateway.TOKEN_INVALID_AUDIENCE"
 			response.ErrorTitle = "Access Token Invalid Audience"
 			response.ErrorDescription = "The access token in the 'Authorization' header has not been issued for this platform"
@@ -153,7 +109,7 @@ func (c *Configuration) Access(kong *pdk.PDK) {
 			response.HttpStatusText = http.StatusText(response.HttpStatusCode)
 			break
 		default:
-			logger.Err("unkown error occurred while checking jwt", err)
+			logger.Err("unknown error occurred while checking jwt", err)
 			response.WrapError(err, kong)
 			return
 		}
@@ -163,14 +119,14 @@ func (c *Configuration) Access(kong *pdk.PDK) {
 	// since the access token now has been validated to be active, request the
 	// userinfo endpoint using the access token as Authorization
 	logger.Debug("requesting userinfo")
-	userinfoRequest, err := http.NewRequest("GET", c.UserinfoEndpoint, nil)
+	userinfoRequest, err := http.NewRequest("GET", UserinfoEndpoint, nil)
 	if err != nil {
 		logger.Err("unable to create new request for userinfo", err)
 		response := GatewayError{}
 		response.WrapError(err, kong)
 		return
 	}
-	userinfoRequest.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	userinfoRequest.Header.Set("Authorization", authorizationHeader)
 	httpClient := http.Client{}
 	userinfoResponse, err := httpClient.Do(userinfoRequest)
 	if err != nil {
@@ -252,17 +208,13 @@ func (c *Configuration) Access(kong *pdk.PDK) {
 	} else {
 		// try to parse the staff string into a boolean
 		isStaff, err := strconv.ParseBool(staffString)
-		if err != nil {
+		if err != nil || !isStaff {
 			kong.ServiceRequest.SetHeader("X-Is-Staff", "false")
 			kong.ServiceRequest.SetHeader("X-Superuser", "false")
 
-		}
-		if isStaff {
+		} else {
 			kong.ServiceRequest.SetHeader("X-Is-Staff", "true")
 			kong.ServiceRequest.SetHeader("X-Superuser", "true")
-		} else {
-			kong.ServiceRequest.SetHeader("X-Is-Staff", "false")
-			kong.ServiceRequest.SetHeader("X-Superuser", "false")
 		}
 	}
 

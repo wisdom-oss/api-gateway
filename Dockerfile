@@ -10,7 +10,6 @@ USER root
 COPY --from=plugin-build /plugins /usr/local/bin/
 USER kong
 ENV KONG_PLUGINSERVER_NAMES=oidc
-ENV KONG_PLUGINSERVER_OIDC_START_CMD="/usr/local/bin/oidc"
 ENV KONG_PLUGINSERVER_OIDC_QUERY_CMD="/usr/local/bin/oidc -dump"
 ENV KONG_PROXY_LISTEN="0.0.0.0:8000 http2 reuseport backlog=16384"
 ENV KONG_ADMIN_LISTEN="0.0.0.0:8001 http2 reuseport backlog=16384"

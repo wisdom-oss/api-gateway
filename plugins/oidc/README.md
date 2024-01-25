@@ -20,22 +20,5 @@ These responses can optionally be cached using a redis database to further
 minimize the number of network requests executed for each intercepted request.
 
 ## Configuration
-### Plugin
-The configuration of the plugin is done using the plugin configuration through
-the Admin API of the Gateway.
-This means that the following parameters are to be set via the configuration of 
-the plugin in the gateway:
-* `jwksUri` &ndash; The URI pointing to the JSON Web Key Set of the Identity 
-  Provider
-* `userinfoUri` &ndash; The URI pointing to the Userinfo Endpoint of the
-  identity provider
-
-## Cache
-Even though the cache is a part of the plugin, it will be configured using
-environment variables on the container the gateway lives in.
-This is done, to allow other plugins to also create a connection to the redis
-cache, if needed.
-To allow the redis connection to be created, the following environment variables
-need to be present in the environment.
-* `REDIS_ENABLED` &ndash; Indicates to plugins, if redis may be used if needed
-* `REDIS_URI` &ndash; Indicates the URI for connecting to the redis database
+The configuration is done automatically during the startup of the api gateway
+using the environment variables passed to the api gateway
