@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Kong/go-pdk"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
@@ -18,14 +19,73 @@ var headerRegex = regexp.MustCompile(`^(\w+) (\S+)$`)
 // Access is executed every time the kong gateway receives a request. Since the
 // plugin may be restarted at any moment
 func (c *Configuration) Access(kong *pdk.PDK) {
+	// create a shortcut for the logger
+	logger := kong.Log
+
+	// get the configuration of the openid connect server
+	res, err := http.Get(c.DiscoveryUri)
+	if err != nil {
+		logger.Crit("unable to load openid connect configuration", err.Error())
+		response := GatewayError{
+			ErrorCode:        "gateway.OPENID_CONNECT_DISCOVERY_FAILURE",
+			ErrorTitle:       "OpenID Connect Discovery Failure",
+			ErrorDescription: "The configured OpenID Connect discovery endpoint could not be accessed",
+			HttpStatusCode:   500,
+			HttpStatusText:   "Internal Server Error",
+		}
+		response.SendError(kong, nil)
+		return
+	}
+	var oidcConfiguration map[string]interface{}
+	err = json.NewDecoder(res.Body).Decode(&oidcConfiguration)
+	if err != nil {
+		logger.Crit("unable to parse open id connect configuration", err.Error())
+		response := GatewayError{
+			ErrorCode:        "gateway.OPENID_CONNECT_DISCOVERY_FAILURE",
+			ErrorTitle:       "OpenID Connect Discovery Failure",
+			ErrorDescription: "The response returned by the configured OpenID Connect discovery endpoint could not be read: " + err.Error(),
+			HttpStatusCode:   500,
+			HttpStatusText:   "Internal Server Error",
+		}
+		response.SendError(kong, nil)
+	}
+
+	// now retrieve the jwks url and the introspection url
+	UserinfoEndpoint := oidcConfiguration["userinfo_endpoint"].(string)
+	JWKSUrl := oidcConfiguration["jwks_uri"].(string)
+	// now download the jwks used to sign the access tokens
+	jwks, err := jwk.Fetch(context.Background(), JWKSUrl)
+	if err != nil {
+		logger.Crit("unable to load JWKS", err.Error())
+		response := GatewayError{
+			ErrorCode:        "gateway.OPENID_CONNECT_JWKS_DOWNLOAD_ERROR",
+			ErrorTitle:       "JWKS Download Error",
+			ErrorDescription: "Unable to download the JWKS needed for validating the access token: " + err.Error(),
+			HttpStatusCode:   500,
+			HttpStatusText:   "Internal Server Error",
+		}
+		response.SendError(kong, nil)
+	}
+
 	// access the request and get the authorization header
 	request := kong.Request
-	logger := kong.Log
-	logger.Info("authenticating new request")
-	logger.Debug("extracting authorization header and its values")
 	authorizationHeader, _ := request.GetHeader("Authorization")
 	// now trim away any blank values at the start or end of the string
 	authorizationHeader = strings.TrimSpace(authorizationHeader)
+	if authorizationHeader == "" {
+		response := GatewayError{
+			ErrorCode:        "gateway.MISSING_AUTHORIZATION_INFORMATION",
+			ErrorTitle:       "Authorization Header Missing",
+			ErrorDescription: "The 'Authorization' header is not set. Please check your request",
+			HttpStatusCode:   401,
+			HttpStatusText:   "Unauthorized",
+		}
+		headers := map[string][]string{
+			"WWW-Authenticate": {`Bearer scope="openid profile email", error="invalid_request", error_description="Authorization header malformed'"`},
+		}
+		response.SendError(kong, headers)
+		return
+	}
 	// now get the authorization method and token from the header
 	matches := headerRegex.FindStringSubmatch(authorizationHeader)
 	if len(matches) != 3 {
@@ -68,14 +128,7 @@ func (c *Configuration) Access(kong *pdk.PDK) {
 
 	// now take the extracted token and parse it using the jwks and validate it
 	logger.Debug("parsing and validating jwt from headers")
-	jwks, err := JWKSCache.Get(context.Background(), JWKSUrl)
-	if err != nil {
-		logger.Err("error while getting jwks", err)
-		response := GatewayError{}
-		response.WrapError(err, kong)
-		return
-	}
-	accessToken, err := jwt.ParseString(token, jwt.WithKeySet(jwks), jwt.WithAudience(OIDC_ClientID), jwt.WithValidate(true))
+	accessToken, err := jwt.ParseString(token, jwt.WithKeySet(jwks), jwt.WithAudience(c.ClientID), jwt.WithValidate(true))
 	if err != nil {
 		// prepare an error response
 		response := GatewayError{}
@@ -203,24 +256,83 @@ func (c *Configuration) Access(kong *pdk.PDK) {
 	// now check if the userinfo response contains the staff marker
 	staffString, isSet := userinfo["staff"].(string)
 	if !isSet {
-		kong.ServiceRequest.SetHeader("X-Is-Staff", "false")
-		kong.ServiceRequest.SetHeader("X-Superuser", "false")
+		err := kong.ServiceRequest.SetHeader("X-Is-Staff", "false")
+		if err != nil {
+			logger.Err("unable to set staff header", err)
+			response := GatewayError{}
+			response.WrapError(err, kong)
+			return
+		}
+		err = kong.ServiceRequest.SetHeader("X-Superuser", "false")
+		if err != nil {
+			logger.Err("unable to set superuser header", err)
+			response := GatewayError{}
+			response.WrapError(err, kong)
+			return
+		}
 	} else {
 		// try to parse the staff string into a boolean
 		isStaff, err := strconv.ParseBool(staffString)
 		if err != nil || !isStaff {
-			kong.ServiceRequest.SetHeader("X-Is-Staff", "false")
-			kong.ServiceRequest.SetHeader("X-Superuser", "false")
-
+			err := kong.ServiceRequest.SetHeader("X-Is-Staff", "false")
+			if err != nil {
+				logger.Err("unable to set staff header", err)
+				response := GatewayError{}
+				response.WrapError(err, kong)
+				return
+			}
+			err = kong.ServiceRequest.SetHeader("X-Superuser", "false")
+			if err != nil {
+				logger.Err("unable to set superuser header", err)
+				response := GatewayError{}
+				response.WrapError(err, kong)
+				return
+			}
 		} else {
-			kong.ServiceRequest.SetHeader("X-Is-Staff", "true")
-			kong.ServiceRequest.SetHeader("X-Superuser", "true")
+			err := kong.ServiceRequest.SetHeader("X-Is-Staff", "true")
+			if err != nil {
+				logger.Err("unable to set staff header", err)
+				response := GatewayError{}
+				response.WrapError(err, kong)
+				return
+			}
+			err = kong.ServiceRequest.SetHeader("X-Superuser", "true")
+			if err != nil {
+				logger.Err("unable to set superuser header", err)
+				response := GatewayError{}
+				response.WrapError(err, kong)
+				return
+			}
 		}
 	}
 
 	// now add the headers to the downstream request, which set the groups
-	kong.ServiceRequest.SetHeader("X-WISdoM-User", username)
-	kong.ServiceRequest.SetHeader("X-Authenticated-User", username)
-	kong.ServiceRequest.SetHeader("X-WISdoM-Groups", groupString)
-	kong.ServiceRequest.SetHeader("X-Authenticated-Groups", groupString)
+	err = kong.ServiceRequest.SetHeader("X-WISdoM-User", username)
+	if err != nil {
+		logger.Err("unable to set username header", err)
+		response := GatewayError{}
+		response.WrapError(err, kong)
+		return
+	}
+	err = kong.ServiceRequest.SetHeader("X-Authenticated-User", username)
+	if err != nil {
+		logger.Err("unable to set authenticated user header", err)
+		response := GatewayError{}
+		response.WrapError(err, kong)
+		return
+	}
+	err = kong.ServiceRequest.SetHeader("X-WISdoM-Groups", groupString)
+	if err != nil {
+		logger.Err("unable to set groups header", err)
+		response := GatewayError{}
+		response.WrapError(err, kong)
+		return
+	}
+	err = kong.ServiceRequest.SetHeader("X-Authenticated-Groups", groupString)
+	if err != nil {
+		logger.Err("unable to set authenticated groups header", err)
+		response := GatewayError{}
+		response.WrapError(err, kong)
+		return
+	}
 }
