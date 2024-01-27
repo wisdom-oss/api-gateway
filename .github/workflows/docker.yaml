@@ -50,7 +50,8 @@ jobs:
             type=ref,event=branch
             type=ref,event=tag
             type=ref,event=pr
-            type=sha
+            type=semver,pattern={{raw}}
+            type=raw,value={{sha}}            
 
       - name: Build and push Docker image
         id: build-and-push
