@@ -21,3 +21,9 @@ Furhtermore, it is extended by a plugin using the
 [`go-pdk`](https://github.com/Kong/go-pdk) to validate JWTs which are used in a
 standard deplyoment to authenticate and secure requests.
 > &mdash; [Read more](plugins/oidc/README.md)
+
+The API Gateway is autommatically configured using the 
+[gateway-service-watcher](https://github.com/wisdom-oss/gateway-service-watcher)
+which acts as a watchdog to check the deployed containers on the host for their
+association to the WISdoM plaform.
+> &mdash; [Read more](https://github.com/wisdom-oss/gateway-service-watcher)
