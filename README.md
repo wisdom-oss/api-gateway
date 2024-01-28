@@ -10,8 +10,7 @@
 </div>
 
 > [!NOTE]
-> This API Gateway is based on the Open Source Edition of the [Kong API Gateway]
-> (https://konghq.com/products/kong-gateway).
+> This API Gateway is based on the Open Source Edition of the [Kong API Gateway](https://konghq.com/products/kong-gateway).
 > Therefore, features available in the free (closed-source) and enterprise (also
 > closed-source) edition are not available with this image.
 
