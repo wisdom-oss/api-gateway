@@ -18,7 +18,7 @@ The API Gateway is the central part of the WISdoM Plaform and manages the access
 to the microservices implemented for the platform.
 Furhtermore, it is extended by a plugin using the 
 [`go-pdk`](https://github.com/Kong/go-pdk) to validate JWTs which are used in a
-standard deplyoment to authenticate and secure requests.
+standard deployment to authenticate and secure requests.
 > &mdash; [Read more](plugins/oidc/README.md)
 
 The API Gateway is autommatically configured using the 
