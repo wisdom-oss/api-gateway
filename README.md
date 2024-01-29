@@ -24,5 +24,5 @@ standard deployment to authenticate and secure requests.
 The API Gateway is autommatically configured using the 
 [gateway-service-watcher](https://github.com/wisdom-oss/gateway-service-watcher)
 which acts as a watchdog to check the deployed containers on the host for their
-association to the WISdoM plaform.
+association to the WISdoM platform.
 > &mdash; [Read more](https://github.com/wisdom-oss/gateway-service-watcher)
