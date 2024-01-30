@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -35,6 +37,11 @@ var bearerTokenRegEx *regexp.Regexp
 var errEmptyEndpoint = errors.New("empty discovery endpoint")
 var errDiscoveryRequestFailure = errors.New("discovery request failed")
 var errDiscoveryUnmarshalFailure = errors.New("unable to unmarshal openid connect configuration")
+var errDiscoveryInvalidType = errors.New("discovery response contained invalid type")
+
+// fieldTypeErrorTemplate is used to keep the same repeating string as a
+// constant before creating error messages with it
+const fieldTypeErrorTemplate = `field '%s' is expected to be 'string' got: %s`
 
 // discoverEndpoints retrieves the userinfo and jwks endpoints from the given
 // discovery endpoint.
@@ -78,8 +85,20 @@ func discoverEndpoints(discoveryEndpoint string) (userinfoEndpoint string, jwksE
 	if err != nil {
 		return "", "", errors.Join(err, errDiscoveryUnmarshalFailure)
 	}
+	var isValidString bool
+	userinfoEndpoint, isValidString = openIdConnectConfiguration["userinfo_endpoint"].(string)
+	if !isValidString {
+		actualType := reflect.TypeOf(openIdConnectConfiguration["userinfo_endpoint"])
+		return "", "", errors.Join(errDiscoveryInvalidType, fmt.Errorf(fieldTypeErrorTemplate, "userinfo_endpoint", actualType))
+	}
 
-	return openIdConnectConfiguration["userinfo_endpoint"].(string), openIdConnectConfiguration["jwks_uri"].(string), nil
+	jwksEndpoint, isValidString = openIdConnectConfiguration["jwks_uri"].(string)
+	if !isValidString {
+		actualType := reflect.TypeOf(openIdConnectConfiguration["jwks_uri"])
+		return "", "", errors.Join(errDiscoveryInvalidType, fmt.Errorf(fieldTypeErrorTemplate, "jwks_uri", actualType))
+	}
+
+	return userinfoEndpoint, jwksEndpoint, nil
 }
 
 // extractBearerToken is a function that takes an authorization header value as
