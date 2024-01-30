@@ -20,5 +20,7 @@ These responses can optionally be cached using a redis database to further
 minimize the number of network requests executed for each intercepted request.
 
 ## Configuration
-The configuration is done automatically during the startup of the api gateway
-using the environment variables passed to the api gateway
+The configuration is done by the 
+[watchdog](https://github.com/wisdom-oss/watchdog) on a service-by-service
+basis.
+Please refer to the documentation of the watchdog for further information
