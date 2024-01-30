@@ -14,7 +14,23 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
-const headerRegex = `^(\w+) (\S+)$`
+// bearerTokenPattern is a regular expression pattern used to validate and parse
+// bearer tokens.
+// It matches the following format: "Bearer <token>". The token is a non-empty
+// string of characters that do not contain whitespace.
+// The pattern is case-insensitive.
+// Example usage:
+//
+//	if matched, _ := regexp.MatchString(bearerTokenPattern, token); matched {
+//	    // Token is valid
+//	} else {
+//	    // Token is invalid
+//	}
+const bearerTokenPattern = `(?i)^(Bearer) (\S+)$`
+
+// bearerTokenRegEx is used to store the regular expression after building it
+// once
+var bearerTokenRegEx *regexp.Regexp
 
 var errEmptyEndpoint = errors.New("empty discovery endpoint")
 var errDiscoveryRequestFailure = errors.New("discovery request failed")
@@ -87,8 +103,11 @@ func discoverEndpoints(discoveryEndpoint string) (userinfoEndpoint string, jwksE
 //
 //	The extracted bearer token, or an empty string if no valid bearer token is found.
 func extractBearerToken(authorizationHeaderValue string) string {
-	regex := regexp.MustCompile(headerRegex)
-	matches := regex.FindStringSubmatch(authorizationHeaderValue)
+	// check if the bearer token regex has already been compiled
+	if bearerTokenRegEx == nil {
+		bearerTokenRegEx = regexp.MustCompile(bearerTokenPattern)
+	}
+	matches := bearerTokenRegEx.FindStringSubmatch(authorizationHeaderValue)
 	if len(matches) == 3 {
 		return matches[2]
 	}
