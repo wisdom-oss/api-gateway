@@ -23,4 +23,4 @@ minimize the number of network requests executed for each intercepted request.
 The configuration is done by the 
 [watchdog](https://github.com/wisdom-oss/watchdog) on a service-by-service
 basis.
-Please refer to the documentation of the watchdog for further information
+Please refer to the documentation of the watchdog for further information.
