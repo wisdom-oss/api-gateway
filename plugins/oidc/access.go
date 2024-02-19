@@ -147,7 +147,7 @@ func (c *Configuration) Access(kong *pdk.PDK) {
 
 	userinfoEndpoint, jwksEndpoint, gwErr := discoverEndpoints(c.DiscoveryUri)
 	if gwErr != nil {
-		logger.Crit("unable to extract required endpoints from openid connect discovery", err)
+		logger.Crit("unable to extract required endpoints from openid connect discovery")
 		gwErr.SendKong(kong)
 		return
 	}
@@ -295,7 +295,8 @@ func (c *Configuration) Access(kong *pdk.PDK) {
 			err := errors.New("group not convertible to string")
 			logger.Err("unable to convert items of group", err, group)
 			response := GatewayError{}
-			response.WrapError(err, kong)
+			response.WrapNativeError(err)
+			response.SendKong(kong)
 			return
 		}
 		groups = append(groups, groupString)
