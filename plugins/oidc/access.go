@@ -280,6 +280,12 @@ func (c *Configuration) Access(kong *pdk.PDK) {
 		return
 	}
 
+	// now extract the username and the groups the token is valid for
+	staff, isSet := userinfo["staff"].(string)
+	if !isSet {
+		staff = "false"
+	}
+
 	groupsInterface, isSet := userinfo["groups"].([]interface{})
 	if !isSet {
 		err := errors.New("userinfo missing 'groups'")
@@ -309,6 +315,7 @@ func (c *Configuration) Access(kong *pdk.PDK) {
 	serviceTokenBuilder.Expiration(time.Now().Add(1 * time.Minute))
 	serviceTokenBuilder.Subject(username)
 	serviceTokenBuilder.Claim("groups", groups)
+	serviceTokenBuilder.Claim("staff", staff)
 	// now retrieve the token
 	serviceToken, err := serviceTokenBuilder.Build()
 	serializer := jwt.NewSerializer()
