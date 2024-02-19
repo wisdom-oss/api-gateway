@@ -1,11 +1,13 @@
 module github.com/wisdom-oss/api-gateway/plugins/oidc
 
-go 1.21
+go 1.22
+
+toolchain go1.22.0
 
 require (
 	github.com/Kong/go-pdk v0.10.0
 	github.com/lestrrat-go/jwx/v2 v2.0.19
-	github.com/wisdom-oss/commonTypes v1.0.0
+	github.com/wisdom-oss/commonTypes/v2 v2.0.0
 )
 
 require (
